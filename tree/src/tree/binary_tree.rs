@@ -46,12 +46,17 @@ impl Node {
             right.get_path_code(code.clone() + &"1", vec);
         }
     }
-
-    fn get_char(&self, code: String) -> char {
+    fn is_accept(&self, ch: char) -> bool {
+        match self.get_char(ch) {
+            Some(ch) => true,
+            None => false,
+        }
+    }
+    fn get_char(&self, code: String) -> Option<char> {
         for c in code.chars() {
             if let Some(k) = self.key {
                 if k == c {
-                    return k.clone();
+                    return Some(k.clone());
                 }
             } else {
                let ch =  match (c, self.left.clone(), self.right.clone()) {
@@ -61,12 +66,12 @@ impl Node {
                     ('1', _, Some(right)) => {
                         right.get_char(code[1..].to_string())
                     },
-                    (_, _, _) => ' ',
+                    (_, _, _) => None,
                 };
                 return ch;
             }
         }
-        return ' ';
+        return None;
 
     }
 }
@@ -158,6 +163,14 @@ impl HuffmanCoder {
             tree: tree,
         }
     }
+
+    fn is_accept(&self, ch: char) -> bool {
+        match self.tree.root {
+            Some(ref root) => root.is_accept(ch),
+            None => false,
+        }
+    }
+
     pub fn ecode(&mut self, src: &'static str) -> String {
         let mut ret = "".to_string();
         for c in src.chars() {
@@ -167,17 +180,59 @@ impl HuffmanCoder {
         }
         ret
     }
-    pub fn decode(&mut self, src: &'static str) -> String {
-        let mut ret = "".to_string();
-        let mut search = "".to_string();
-        for c in src.chars() {
-            search = search + &(c.to_string());
-            if let Some(k) = self.tree.ecode_map.get(search) {
-                ret = ret + &k;
-                search = "".to_string();
+
+    pub fn decode(&self, src: &'static str) -> String {
+        let mut cursor = Cursor::new(src);
+        let mut res = String::new();
+        while !cursor.eof() {
+            match self.tree.root {
+                Some(ref root) => {
+                    let str = cursor.consumeWhile(self.is_accept);
+                    res.push(str);
+                },
+                None => println!("root is null"),
             }
         }
-        ret
+        res
+    }
+
+}
+
+pub struct Cursor {
+    input: &'static str,
+    pos: usize,
+}
+
+impl Cursor {
+    pub fn new(input: &'static str) -> Cursor {
+        Cursor {
+            input: input,
+            pos: 0,
+        }
+    }
+    pub fn consumeWhile<F>(&mut self, test: F) -> String
+        where F: Fn(char) -> bool {
+        let mut res = String::new();
+        while !self.eof() && test(self.next_char()) {
+            res.push(self.consume_char());
+        }
+        res
+    }
+
+    pub fn consume_char(&mut self) -> char {
+        let mut iter = self.input[self.pos..].char_indices();
+        let (_, cur_char) = iter.next().unwrap();
+        let (next_pos, _) = iter.next().unwrap_or((1, ' '));
+        self.pos += next_pos;
+        return cur_char;
+    }
+
+    pub fn next_char(&self) -> char {
+        self.input[self.pos..].chars().next().unwrap()
+    }
+
+    pub fn eof(&self) -> bool {
+        self.pos >= self.input.len()
     }
 }
 
