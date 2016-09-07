@@ -46,36 +46,8 @@ impl Node {
             right.get_path_code(code.clone() + &"1", vec);
         }
     }
-    fn is_accept(&self, ch: char) -> bool {
-        match self.get_char(ch) {
-            Some(ch) => true,
-            None => false,
-        }
-    }
-    fn get_char(&self, code: String) -> Option<char> {
-        for c in code.chars() {
-            if let Some(k) = self.key {
-                if k == c {
-                    return Some(k.clone());
-                }
-            } else {
-               let ch =  match (c, self.left.clone(), self.right.clone()) {
-                    ('0', Some(left), _) => {
-                        left.get_char(code[1..].to_string())
-                    },
-                    ('1', _, Some(right)) => {
-                        right.get_char(code[1..].to_string())
-                    },
-                    (_, _, _) => None,
-                };
-                return ch;
-            }
-        }
-        return None;
-
-    }
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HuffmanTree {
     root: Option<Node>,
     ecode_map: HashMap<char, String>,
@@ -153,6 +125,8 @@ impl HuffmanTree {
 
 pub struct HuffmanCoder {
     tree: HuffmanTree,
+    input: &'static str,
+    pos: usize,
 }
 
 impl HuffmanCoder {
@@ -161,15 +135,11 @@ impl HuffmanCoder {
         tree.build_ecode_map();
         HuffmanCoder {
             tree: tree,
+            pos: 0,
+            input: "",
         }
     }
 
-    fn is_accept(&self, ch: char) -> bool {
-        match self.tree.root {
-            Some(ref root) => root.is_accept(ch),
-            None => false,
-        }
-    }
 
     pub fn ecode(&mut self, src: &'static str) -> String {
         let mut ret = "".to_string();
@@ -181,45 +151,44 @@ impl HuffmanCoder {
         ret
     }
 
-    pub fn decode(&self, src: &'static str) -> String {
-        let mut cursor = Cursor::new(src);
+
+    pub fn decode(&mut self, src: &'static str) -> String {
         let mut res = String::new();
-        while !cursor.eof() {
+        while self.eof() {
             match self.tree.root {
-                Some(ref root) => {
-                    let str = cursor.consumeWhile(self.is_accept);
-                    res.push(str);
+                Some(_) => {
+                    let str = self.consumeWhile(Self::is_accept);
+                    res = res + &str;
                 },
                 None => println!("root is null"),
             }
         }
         res
     }
+    fn is_accept(node: Node, c: char) -> bool {
+        if let Some(ch) = node.key {
+            if ch == c {
+                return true;
+            }
 
-}
-
-pub struct Cursor {
-    input: &'static str,
-    pos: usize,
-}
-
-impl Cursor {
-    pub fn new(input: &'static str) -> Cursor {
-        Cursor {
-            input: input,
-            pos: 0,
+        }
+        match (node.left.clone(), node.right.clone()) {
+            (Some(ref left), Some(ref right)) => Self::is_accept(**left, c) && Self::is_accept(**right, c),
+            (Some(ref left), _) => Self::is_accept(**left, c),
+            (_, Some(ref right)) => Self::is_accept(**right, c),
+            (_, _) => false,
         }
     }
-    pub fn consumeWhile<F>(&mut self, test: F) -> String
-        where F: Fn(char) -> bool {
+    fn consumeWhile<F>(&mut self, test: F) -> String
+        where F: Fn(Node, char) -> bool {
         let mut res = String::new();
-        while !self.eof() && test(self.next_char()) {
+        while !self.eof() && test(self.tree.root.unwrap(), self.next_char()) {
             res.push(self.consume_char());
         }
         res
     }
 
-    pub fn consume_char(&mut self) -> char {
+    fn consume_char(&mut self) -> char {
         let mut iter = self.input[self.pos..].char_indices();
         let (_, cur_char) = iter.next().unwrap();
         let (next_pos, _) = iter.next().unwrap_or((1, ' '));
@@ -227,14 +196,16 @@ impl Cursor {
         return cur_char;
     }
 
-    pub fn next_char(&self) -> char {
+    fn next_char(&self) -> char {
         self.input[self.pos..].chars().next().unwrap()
     }
 
-    pub fn eof(&self) -> bool {
+    fn eof(&self) -> bool {
         self.pos >= self.input.len()
     }
+
 }
+
 
 
 
