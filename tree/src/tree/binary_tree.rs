@@ -125,7 +125,7 @@ impl HuffmanTree {
 
 pub struct HuffmanCoder {
     tree: HuffmanTree,
-    input: &'static str,
+    input: String,
     pos: usize,
 }
 
@@ -136,7 +136,7 @@ impl HuffmanCoder {
         HuffmanCoder {
             tree: tree,
             pos: 0,
-            input: "",
+            input: "".to_string(),
         }
     }
 
@@ -152,41 +152,39 @@ impl HuffmanCoder {
     }
 
 
-    pub fn decode(&mut self, src: &'static str) -> String {
+    pub fn decode(&mut self, src: String) -> String {
+        self.input = src;
         let mut res = String::new();
-        while self.eof() {
-            match self.tree.root {
-                Some(_) => {
-                    let str = self.consumeWhile(Self::is_accept);
-                    res = res + &str;
+        let mut root: Node = self.tree.root.clone().unwrap();
+        while !self.eof() {
+            if let Some(k) = root.key {
+                res.push(k);
+                root = self.tree.root.clone().unwrap();
+                continue;
+            }
+            match self.consume_char() {
+                '0' => {
+                    match root.left.clone() {
+                        Some(ref left) => root = *left.clone(),
+                        None => println!("left should has a arm"),
+                    }
                 },
-                None => println!("root is null"),
+                '1' => {
+                    match root.right.clone() {
+                        Some(ref right) => root = *right.clone(),
+                        None => println!("right should has a arm"),
+                    }
+                },
+                _   => println!("error!"),
             }
+        }
+        if let Some(k) = root.key {
+            res.push(k);
+            root = self.tree.root.clone().unwrap();
         }
         res
     }
-    fn is_accept(node: Node, c: char) -> bool {
-        if let Some(ch) = node.key {
-            if ch == c {
-                return true;
-            }
 
-        }
-        match (node.left.clone(), node.right.clone()) {
-            (Some(ref left), Some(ref right)) => Self::is_accept(**left, c) && Self::is_accept(**right, c),
-            (Some(ref left), _) => Self::is_accept(**left, c),
-            (_, Some(ref right)) => Self::is_accept(**right, c),
-            (_, _) => false,
-        }
-    }
-    fn consumeWhile<F>(&mut self, test: F) -> String
-        where F: Fn(Node, char) -> bool {
-        let mut res = String::new();
-        while !self.eof() && test(self.tree.root.unwrap(), self.next_char()) {
-            res.push(self.consume_char());
-        }
-        res
-    }
 
     fn consume_char(&mut self) -> char {
         let mut iter = self.input[self.pos..].char_indices();
@@ -196,9 +194,6 @@ impl HuffmanCoder {
         return cur_char;
     }
 
-    fn next_char(&self) -> char {
-        self.input[self.pos..].chars().next().unwrap()
-    }
 
     fn eof(&self) -> bool {
         self.pos >= self.input.len()
